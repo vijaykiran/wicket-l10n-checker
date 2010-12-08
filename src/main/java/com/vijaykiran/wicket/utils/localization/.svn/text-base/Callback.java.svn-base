@@ -1,0 +1,9 @@
+package com.vijaykiran.wicket.utils.localization;
+
+/**
+ * @author Mathieu Carbou (mathieu.carbou@gmail.com)
+ * @author Vijay Kiran (mail@vijaykiran.com)
+ */
+public interface Callback {
+    void onCheckFile(String filename);
+}

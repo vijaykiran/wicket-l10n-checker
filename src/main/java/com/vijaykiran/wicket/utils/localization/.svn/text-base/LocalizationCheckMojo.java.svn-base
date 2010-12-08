@@ -1,0 +1,146 @@
+/**
+ * Copyright (C) 2008 http://wicket.google.com/p/maven-localization-plugin/
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.vijaykiran.wicket.utils.localization;
+
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+/**
+ * @author Mathieu Carbou (mathieu.carbou@gmail.com)
+ * @author Vijay Kiran (mail@vijaykiran.com)
+ * @goal check
+ * @phase verify
+ * @threadSafe
+ */
+public final class LocalizationCheckMojo extends AbstractLocalizationCheckerMojo {
+
+
+    static Locale[] supportedLocales = {
+            new Locale("fr", "FR"),
+            new Locale("it", "IT"),
+            new Locale("nl", "NL")
+    };
+
+    public void execute() throws MojoExecutionException, MojoFailureException {
+        final Map<String, List<String>> missingFileKeyMap = new ConcurrentHashMap<String, List<String>>();
+        final List<String> missingBundles = new CopyOnWriteArrayList<String>();
+
+        execute(new Callback() {
+            public void onCheckFile(String filename) {
+
+                ResourceBundle defaultBundle = null;
+                try {
+                    defaultBundle = new PropertyResourceBundle(new FileInputStream(basedir.getAbsolutePath() + File.separator + filename));
+                } catch (IOException e) {
+                    info("Unable to load Resource ", e);
+                }
+
+                if (defaultBundle != null) {
+                    for (Locale supportedLocale : supportedLocales) {
+                        String localeFileName = filename.replace(".properties", "_" + supportedLocale.getLanguage() + ".properties");
+                        FileInputStream otherBundleStream = null;
+                        try {
+                            otherBundleStream = new FileInputStream(basedir.getAbsolutePath() + File.separator + localeFileName);
+                        } catch (FileNotFoundException e) {
+                            missingBundles.add(getFullPath(localeFileName));
+                            debug("Unable to load file: " + getFullPath(localeFileName));
+                        }
+
+                        ResourceBundle otherBundle = null;
+                        try {
+                            otherBundle = new PropertyResourceBundle(otherBundleStream);
+                        } catch (IOException e) {
+                            getLog().error("Unable to load the resource defaultBundle" + e);
+                        }
+
+                        if (otherBundle != null) {
+                            List<String> missingKeys = new ArrayList<String>();
+                            Set<String> keySet = defaultBundle.keySet();
+                            for (String key : keySet) {
+                                if (!otherBundle.containsKey(key)) {
+                                    missingKeys.add(key);
+                                }
+                            }
+                            if (missingKeys.size() > 0) {
+                                missingFileKeyMap.put(localeFileName, missingKeys);
+                            }
+                        }
+
+                    }
+                }
+
+            }
+        });
+
+        StringBuffer resultsHtmlString = new StringBuffer();
+        if(missingBundles.size() > 0) {
+            resultsHtmlString.append("<h2>Missing Properties Files</h2><br/>");
+        }
+
+        resultsHtmlString.append("<table>");
+        for (String missingBundle : missingBundles) {
+            info("Missing Properties file :  " + missingBundle);
+            resultsHtmlString.append("<tr><td>").append(missingBundle).append("</tr></td>");
+
+        }
+        resultsHtmlString.append("</table>");
+
+
+        for (String file : missingFileKeyMap.keySet()) {
+            resultsHtmlString.append("<h2>Missing Keys in ").append(file).append(" </h2><br/>");
+            info("Missing keys in file " + file);
+            List<String> keys = missingFileKeyMap.get(file);
+            resultsHtmlString.append("<table>");
+            for (String key : keys) {
+                resultsHtmlString.append("<tr><td>").append(key).append("</tr></td>");
+            }
+            resultsHtmlString.append("</table>");
+        }
+
+        info("Appending results to " + resultsFilePath);
+
+        FileWriter writer = null;
+        try {
+            writer = new FileWriter(resultsFilePath, true);
+            writer.append(resultsHtmlString.toString());
+
+        } catch (IOException e) {
+            info("Unable to write to file " + e);
+        } finally {
+            try {
+                if (writer != null) {
+                    writer.close();
+                }
+            } catch (IOException e) {
+                //Ignore.
+            }
+        }
+
+    }
+
+    private String getFullPath(String filename) {
+        return basedir.getAbsolutePath() + File.separator + filename;
+    }
+
+
+}
