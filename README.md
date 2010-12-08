@@ -1,9 +1,19 @@
+h2. Wicket Localization Checker Plugin
+
 A maven2 plugin for checking the localization files in a wicket project.
 
- How To:
+This plugin works by scanning project base dir for .properties files and verifies if all the properties files contain the same labels.It also checks for the existence of the other locale properties
+files as specified in the checkLocales tag.
 
- Add the plugin to your <build><plugins>
+The plugin currently supports following options:
 
+strictChecking : When set to true the build fails if there any problems with the .properties files or missing labels.
+checkLocales: The list of locales to check for.
+quiet: Runs in quiet mode, by printing less info on the console.
+
+
+ h2. Usage
+ Add the plugin to your build plugins:
 
 	  <plugin>
 		<groupId>com.vijaykiran.wicket.utils</groupId>
